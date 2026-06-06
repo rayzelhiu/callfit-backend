@@ -13,10 +13,9 @@ class WorkoutStation extends Model
         'template_id',
         'station_number',
         'exercise_id',
-        'work_duration',
-        'rest_duration',
-        'switch_duration',
-        'total_sets',
+        'work_duration_override',
+        'rest_duration_override',
+        'total_sets_override',
         'sort_order'
     ];
 

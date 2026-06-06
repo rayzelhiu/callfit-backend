@@ -2,28 +2,27 @@
 
 namespace App\Http\Requests\Workout;
 
-use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateWorkoutTemplateRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
-        return false;
+        return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, ValidationRule|array<mixed>|string>
-     */
-    public function rules(): array
-    {
-        return [
-            //
-        ];
-    }
+   public function rules(): array
+{
+    return [
+        'name' => 'required|string|max:255',
+        'description' => 'nullable|string',
+
+        'work_duration' => 'required|integer|min:1',
+        'rest_duration' => 'required|integer|min:0',
+        'switch_duration' => 'required|integer|min:0',
+
+        'total_sets' => 'required|integer|min:1',
+        'total_rounds' => 'required|integer|min:1',
+    ];
+}
 }

@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Http\Requests\Exercise;
+namespace App\Http\Requests\Workout;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class StoreExerciseRequest extends FormRequest
+class StoreWorkoutTemplateRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -16,8 +16,11 @@ class StoreExerciseRequest extends FormRequest
         return [
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'video_url' => 'nullable|string',
-            'thumbnail_url' => 'nullable|string',
+            'work_duration' => 'required|integer|min:1',
+            'rest_duration' => 'required|integer|min:0',
+            'switch_duration' => 'required|integer|min:0',
+            'total_sets' => 'required|integer|min:1',
+            'total_rounds' => 'required|integer|min:1',
         ];
     }
 }

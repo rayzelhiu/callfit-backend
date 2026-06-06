@@ -12,24 +12,30 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('workout_sessions', function (Blueprint $table) {
+
+            $table->id();
+
             $table->foreignId('template_id')
                 ->constrained('workout_templates')
                 ->cascadeOnDelete();
 
-            $table->foreignId('started_by')
-                ->constrained('users')
-                ->cascadeOnDelete();
-
             $table->enum('status', [
-                'WAITING',
-                'RUNNING',
-                'PAUSED',
-                'FINISHED'
-            ])->default('WAITING');
+                'waiting',
+                'running',
+                'paused',
+                'finished'
+            ])->default('waiting');
+
+            $table->unsignedInteger('current_station')->default(1);
+
+            $table->unsignedInteger('current_set')->default(1);
 
             $table->timestamp('started_at')->nullable();
 
-            $table->timestamp('ended_at')->nullable();
+            $table->timestamp('finished_at')->nullable();
+
+            $table->timestamps();
+
         });
     }
 

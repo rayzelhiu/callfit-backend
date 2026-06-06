@@ -12,29 +12,29 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('workout_templates', function (Blueprint $table) {
+
             $table->id();
 
-            $table->foreignId('template_id')
-                ->constrained('workout_templates')
+            $table->string('name');
+
+            $table->text('description')->nullable();
+
+            $table->unsignedInteger('work_duration')->default(40);
+
+            $table->unsignedInteger('rest_duration')->default(15);
+
+            $table->unsignedInteger('switch_duration')->default(20);
+
+            $table->unsignedInteger('total_sets')->default(2);
+
+            $table->unsignedInteger('total_rounds')->default(1);
+
+            $table->foreignId('created_by')
+                ->constrained('users')
                 ->cascadeOnDelete();
-
-            $table->integer('station_number');
-
-            $table->foreignId('exercise_id')
-                ->constrained('exercises')
-                ->cascadeOnDelete();
-
-            $table->integer('work_duration');
-
-            $table->integer('rest_duration');
-
-            $table->integer('switch_duration');
-
-            $table->integer('total_sets');
-
-            $table->integer('sort_order')->default(1);
 
             $table->timestamps();
+
         });
     }
 
