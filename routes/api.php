@@ -43,21 +43,16 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::apiResource('workouts', WorkoutTemplateController::class);
 
-    Route::middleware('auth:sanctum')->group(function () {
-        Route::get('/workouts/{id}/stations', [WorkoutStationController::class, 'index']);
-        Route::post('/workouts/stations', [WorkoutStationController::class, 'store']);
-        Route::put('/workouts/stations/{id}', [WorkoutStationController::class, 'update']);
-        Route::delete('/workouts/stations/{id}', [WorkoutStationController::class, 'destroy']);
+    Route::get('/workouts/{id}/stations', [WorkoutStationController::class, 'index']);
+    Route::post('/workouts/stations', [WorkoutStationController::class, 'store']);
+    Route::put('/workouts/stations/{id}', [WorkoutStationController::class, 'update']);
+    Route::delete('/workouts/stations/{id}', [WorkoutStationController::class, 'destroy']);
 
-    });
-
-    Route::prefix('sessions')->group(function () {
-        Route::post('/start', [WorkoutSessionController::class, 'start']);
-        Route::post('/pause', [WorkoutSessionController::class, 'pause']);
-        Route::post('/resume', [WorkoutSessionController::class, 'resume']);
-        Route::post('/finish', [WorkoutSessionController::class, 'finish']);
-        Route::get('/current', [WorkoutSessionController::class, 'current']);
-    });
+    Route::post('/sessions/start', [WorkoutSessionController::class, 'start']);
+    Route::get('/sessions/current', [WorkoutSessionController::class, 'current']);
+    Route::post('/sessions/pause', [WorkoutSessionController::class, 'pause']);
+    Route::post('/sessions/resume', [WorkoutSessionController::class, 'resume']);
+    Route::post('/sessions/finish', [WorkoutSessionController::class, 'finish']);
 
 });
 

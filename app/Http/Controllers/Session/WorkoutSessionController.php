@@ -3,62 +3,148 @@
 namespace App\Http\Controllers\Session;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
+use App\Http\Requests\Session\StartWorkoutSessionRequest;
+use App\Models\WorkoutSession;
+use App\Models\WorkoutTemplate;
+
 class WorkoutSessionController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
+    public function start(StartWorkoutSessionRequest $request)
     {
-        //
+        $template = WorkoutTemplate::findOrFail($request->template_id);
+
+      
+        $user = $request->user(); // 🔥 FIX AUTH DI SINI
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'Unauthenticated'
+            ], 401);
+        }
+        
+        $activeSession = WorkoutSession::whereIn('status', [
+            'running',
+            'paused'
+        ])->exists();
+
+        if ($activeSession) {
+
+            return response()->json([
+                'success' => false,
+                'message' => 'There is already an active workout session.'
+            ], 422);
+
+        }
+        
+        $session = WorkoutSession::create([
+            'template_id' => $template->id,
+            'started_by' => $user->id,
+            'status' => 'running',
+            'current_phase' => 'demo',
+            'current_round' => 1,
+            'current_station' => 1,
+            'current_set' => 1,
+            'started_at' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Session started',
+            'data' => $session
+        ]);
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
+    public function current()
     {
-        //
+        $session = WorkoutSession::with([
+            'template',
+            'template.stations.exercise'
+        ])
+        ->whereIn('status', ['running', 'paused'])
+        ->latest()
+        ->first();
+
+        if (!$session) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No active workout session.'
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $session
+        ]);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
+    public function pause()
     {
-        //
+        $session = WorkoutSession::where('status', 'running')->latest()->first();
+
+        if (!$session) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No running workout session.'
+            ], 404);
+        }
+
+        $session->update([
+            'status' => 'paused'
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Workout paused.',
+            'data' => $session
+        ]);
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
+   public function resume()
     {
-        //
-    }
+        $session = WorkoutSession::where('status', 'paused')->latest()->first();
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        //
-    }
+        if (!$session) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No paused workout session.'
+            ], 404);
+        }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        //
-    }
+        $session->update([
+            'status' => 'running'
+        ]);
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
+        return response()->json([
+            'success' => true,
+            'message' => 'Workout resumed.',
+            'data' => $session
+        ]);
+    }
+    
+    public function finish()
     {
-        //
+        $session = WorkoutSession::whereIn('status', [
+            'running',
+            'paused'
+        ])->latest()->first();
+
+        if (!$session) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No active workout session.'
+            ], 404);
+        }
+
+        $session->update([
+            'status' => 'finished',
+            'current_phase' => 'finished',
+            'finished_at' => now()
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Workout finished.',
+            'data' => $session
+        ]);
     }
 }

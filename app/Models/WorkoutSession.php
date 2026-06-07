@@ -10,17 +10,21 @@ class WorkoutSession extends Model
     use HasFactory;
 
     protected $fillable = [
-        'template_id',
-        'started_by',
-        'status',
-        'started_at',
-        'ended_at'
-    ];
+    'template_id',
+    'started_by',
+    'status',
+    'current_phase',
+    'current_station',
+    'current_set',
+    'current_round',
+    'started_at',
+    'finished_at',
+];
 
-    protected $casts = [
-        'started_at' => 'datetime',
-        'ended_at' => 'datetime',
-    ];
+protected $casts = [
+    'started_at' => 'datetime',
+    'finished_at' => 'datetime',
+];
 
     public function template()
     {
