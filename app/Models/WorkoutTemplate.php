@@ -12,6 +12,8 @@ class WorkoutTemplate extends Model
     protected $fillable = [
         'name',
         'description',
+        'warmup_duration',
+        'cooldown_duration',
         'work_duration',
         'rest_duration',
         'switch_duration',

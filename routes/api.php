@@ -61,5 +61,16 @@ Route::middleware('auth:sanctum')->group(function () {
 | TV
 |--------------------------------------------------------------------------
 */
+Route::get('/time', function () {
+    return [
+        'config' => config('app.timezone'),
+        'now' => now()->toDateTimeString(),
+        'php' => date('Y-m-d H:i:s'),
+    ];
+});
 
 Route::get('/tv/current', [TVController::class, 'current']);
+Route::get('/sessions/current-state', [
+    WorkoutSessionController::class,
+    'currentState'
+]);

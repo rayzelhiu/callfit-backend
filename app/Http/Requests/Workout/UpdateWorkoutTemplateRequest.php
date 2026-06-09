@@ -11,18 +11,21 @@ class UpdateWorkoutTemplateRequest extends FormRequest
         return true;
     }
 
-   public function rules(): array
-{
-    return [
-        'name' => 'required|string|max:255',
-        'description' => 'nullable|string',
+    public function rules(): array
+    {
+        return [
+            'name' => 'sometimes|string|max:255',
+            'description' => 'sometimes|nullable|string',
 
-        'work_duration' => 'required|integer|min:1',
-        'rest_duration' => 'required|integer|min:0',
-        'switch_duration' => 'required|integer|min:0',
+            'warmup_duration' => 'sometimes|integer|min:0',
+            'cooldown_duration' => 'sometimes|integer|min:0',
 
-        'total_sets' => 'required|integer|min:1',
-        'total_rounds' => 'required|integer|min:1',
-    ];
-}
+            'work_duration' => 'sometimes|integer|min:1',
+            'rest_duration' => 'sometimes|integer|min:0',
+            'switch_duration' => 'sometimes|integer|min:0',
+
+            'total_sets' => 'sometimes|integer|min:1',
+            'total_rounds' => 'sometimes|integer|min:1',
+        ];
+    }
 }

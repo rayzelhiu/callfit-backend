@@ -16,6 +16,8 @@ class StoreWorkoutTemplateRequest extends FormRequest
         return [
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'warmup_duration' => 'required|integer|min:0',
+            'cooldown_duration' => 'required|integer|min:0',
             'work_duration' => 'required|integer|min:1',
             'rest_duration' => 'required|integer|min:0',
             'switch_duration' => 'required|integer|min:0',
