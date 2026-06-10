@@ -12,7 +12,6 @@ class WarmupExercise extends Model
     protected $fillable = [
         'template_id',
         'exercise_id',
-        'duration',
         'sort_order'
     ];
 

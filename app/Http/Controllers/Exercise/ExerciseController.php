@@ -19,8 +19,11 @@ class ExerciseController extends Controller
 
     public function store(StoreExerciseRequest $request)
     {
-        $exercise = Exercise::create($request->validated());
+        $data = $request->validated();
 
+        $data['category'] = $data['category'] ?? 'general';
+
+        $exercise = Exercise::create($data);
         return response()->json([
             'success' => true,
             'message' => 'Exercise berhasil ditambahkan',

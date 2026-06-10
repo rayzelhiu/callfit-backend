@@ -13,7 +13,8 @@ class Exercise extends Model
         'name',
         'description',
         'video_url',
-        'thumbnail_url'
+        'thumbnail_url',
+        'category'
     ];
 
     public function workoutStations()

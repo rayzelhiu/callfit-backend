@@ -23,8 +23,8 @@ class WorkoutEngineService
             'total_stations' => $this->getStationCount($session),
 
             'exercise' => $phase === 'finished'
-                ? null
-                : $this->getCurrentExercise($session),
+            ? null
+            : $this->getCurrentExerciseByPhase($session, $phase),
 
             'current_set' => $phase === 'finished'
                 ? null
@@ -364,7 +364,48 @@ class WorkoutEngineService
         return $this->getStationDuration($session) - $stationElapsed;
     }
 
-    public function getCurrentExercise(WorkoutSession $session)
+        private function getWarmupIndex(WorkoutSession $session): int
+    {
+        $elapsed = $this->getElapsedSeconds($session);
+
+        return (int) floor(
+            $elapsed / max(1, $this->template($session)->warmup_duration)
+        );
+    }
+
+    private function getCooldownIndex(WorkoutSession $session): int
+    {
+        $elapsed = $this->getElapsedSeconds($session);
+
+        $workoutTime =
+            $this->getWarmupTotal($session) +
+            $this->getWorkoutDuration($session);
+
+        $after = $elapsed - $workoutTime;
+
+        if ($after < 0) {
+            return 0;
+        }
+
+        return (int) floor(
+            $after / max(1, $this->template($session)->cooldown_duration)
+        );
+    }
+    private function getWarmupExercise(WorkoutSession $session)
+    {
+        $index = $this->getWarmupIndex($session);
+
+        return $session->template
+            ->warmups()
+            ->with('exercise')
+            ->orderBy('sort_order')
+            ->get()
+            ->values()
+            ->get($index)
+            ?->exercise;
+    }
+
+        private function getWorkoutExercise(WorkoutSession $session)
     {
         if ($this->isFinished($session)) {
             return null;
@@ -376,13 +417,40 @@ class WorkoutEngineService
             return null;
         }
 
-        $station = $this->template($session)
+        $station = $session->template
             ->stations()
             ->with('exercise')
             ->where('station_number', $stationNumber)
             ->first();
 
         return $station?->exercise;
+    }
+
+    private function getCooldownExercise(WorkoutSession $session)
+    {
+        $index = $this->getCooldownIndex($session);
+
+        return $session->template
+            ->cooldowns()
+            ->with('exercise')
+            ->orderBy('sort_order')
+            ->get()
+            ->values()
+            ->get($index)
+            ?->exercise;
+    }
+   private function getCurrentExerciseByPhase(WorkoutSession $session, string $phase)
+    {
+        return match ($phase) {
+
+            'warmup' => $this->getWarmupExercise($session),
+
+            'work', 'rest', 'switch' => $this->getWorkoutExercise($session),
+
+            'cooldown' => $this->getCooldownExercise($session),
+
+            default => null,
+        };
     }
     public function isFinished(WorkoutSession $session): bool
     {

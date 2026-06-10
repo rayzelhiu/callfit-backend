@@ -4,6 +4,8 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Exercise\ExerciseController;
+use App\Http\Controllers\WarmUp\WarmupController;
+use App\Http\Controllers\CoolDown\CooldownController;
 use App\Http\Controllers\Workout\WorkoutTemplateController;
 use App\Http\Controllers\Workout\WorkoutStationController;
 use App\Http\Controllers\Session\WorkoutSessionController;
@@ -42,6 +44,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('exercises', ExerciseController::class);
 
     Route::apiResource('workouts', WorkoutTemplateController::class);
+
+    Route::apiResource('warmups', WarmupController::class);
+    Route::apiResource('cooldowns', CoolDownController::class);
 
     Route::get('/workouts/{id}/stations', [WorkoutStationController::class, 'index']);
     Route::post('/workouts/stations', [WorkoutStationController::class, 'store']);

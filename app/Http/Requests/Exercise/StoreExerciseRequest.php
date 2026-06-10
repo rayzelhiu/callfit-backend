@@ -18,6 +18,7 @@ class StoreExerciseRequest extends FormRequest
             'description' => 'nullable|string',
             'video_url' => 'nullable|string',
             'thumbnail_url' => 'nullable|string',
+            'category' => 'nullable|in:warmup,workout,cooldown,general',
         ];
     }
 }
