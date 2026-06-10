@@ -43,13 +43,11 @@ class WorkoutEngineService
         ];
     }
     public function getElapsedSeconds(WorkoutSession $session): int
-{
-    return max(
-        0,
-        $session->started_at->diffInSeconds(now())
-    );
-}
+    {
+        $base = $session->started_at->diffInSeconds(now());
 
+        return max(0, $base - $session->paused_total_seconds);
+    }
     private function template(WorkoutSession $session)
     {
         return $session->template;
@@ -452,8 +450,10 @@ class WorkoutEngineService
             default => null,
         };
     }
+    
     public function isFinished(WorkoutSession $session): bool
-    {
-        return $this->getCurrentPhase($session) === 'finished';
-    }
+{
+    
+    return $this->getCurrentPhase($session) === 'finished';
+}
 }
