@@ -92,23 +92,29 @@ class WorkoutSessionController extends Controller
     | PAUSE SESSION (FREEZE TIME)
     |--------------------------------------------------------------------------
     */
-    public function pause()
+    public function pause(WorkoutEngineService $engine)
     {
-        $session = WorkoutSession::where('status', 'running')->latest()->first();
+        $session = WorkoutSession::where('status', 'running')
+            ->latest()
+            ->first();
 
         if (!$session) {
-            return response()->json(['message' => 'No running session'], 404);
+            return response()->json([
+                'success' => false,
+                'message' => 'No running session.'
+            ], 404);
         }
 
         $session->update([
             'status' => 'paused',
             'paused_at' => now(),
+            'current_phase' => $engine->getCurrentPhase($session),
         ]);
 
         return response()->json([
             'success' => true,
             'message' => 'Paused',
-            'data' => $session
+            'data' => $session->fresh()
         ]);
     }
 
@@ -118,29 +124,35 @@ class WorkoutSessionController extends Controller
     |--------------------------------------------------------------------------
     */
     public function resume()
-    {
-        $session = WorkoutSession::where('status', 'paused')->latest()->first();
+{
+    $session = WorkoutSession::where('status', 'paused')
+        ->latest()
+        ->first();
 
-        if (!$session) {
-            return response()->json(['message' => 'No paused session'], 404);
-        }
-
-        $pausedSeconds = $session->paused_at
-            ? $session->paused_at->diffInSeconds(now())
-            : 0;
-
-        $session->update([
-            'status' => 'running',
-            'paused_total_seconds' => $session->paused_total_seconds + $pausedSeconds,
-            'paused_at' => null,
-        ]);
-
+    if (!$session) {
         return response()->json([
-            'success' => true,
-            'message' => 'Resumed',
-            'data' => $session
-        ]);
+            'success' => false,
+            'message' => 'No paused session.'
+        ], 404);
     }
+
+    $pausedSeconds = $session->paused_at
+        ? $session->paused_at->diffInSeconds(now())
+        : 0;
+
+    $session->update([
+        'status' => 'running',
+        'paused_total_seconds' =>
+            ($session->paused_total_seconds ?? 0) + $pausedSeconds,
+        'paused_at' => null,
+    ]);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Resumed',
+        'data' => $session->fresh()
+    ]);
+}
 
     /*
     |--------------------------------------------------------------------------
@@ -196,7 +208,7 @@ class WorkoutSessionController extends Controller
             ], 404);
         }
 
-        // kalau finished, paksa update DB
+        // Auto finish jika engine sudah selesai
         if ($engine->isFinished($session) && $session->status !== 'finished') {
             $session->update([
                 'status' => 'finished',
@@ -207,21 +219,17 @@ class WorkoutSessionController extends Controller
             $session->refresh();
         }
 
-        // IMPORTANT: kalau paused → freeze output engine
+        $state = $engine->getCurrentState($session);
+
+        // Kalau paused, status diubah menjadi paused,
+        // tapi phase/exercise/station/timer tetap dipertahankan
         if ($session->status === 'paused') {
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'status' => 'paused',
-                    'phase' => 'paused',
-                    'exercise' => null,
-                    'remaining_time' => 0,
-                ]
-            ]);
+            $state['status'] = 'paused';
         }
+
         return response()->json([
             'success' => true,
-            'data' => $engine->getCurrentState($session)
+            'data' => $state
         ]);
     }
 }
