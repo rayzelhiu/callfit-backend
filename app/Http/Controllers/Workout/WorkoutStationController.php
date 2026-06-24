@@ -30,18 +30,18 @@ class WorkoutStationController extends Controller
         $request->validate([
             'template_id' => 'required|exists:workout_templates,id',
             'exercise_id' => 'required|exists:exercises,id',
-            'station_number' => 'required|integer',
-            'sort_order' => 'nullable|integer',
-            'work_duration_override' => 'nullable|integer',
-            'rest_duration_override' => 'nullable|integer',
-            'total_sets_override' => 'nullable|integer',
         ]);
+
+        $nextStationNumber = WorkoutStation::where(
+            'template_id',
+            $request->template_id
+        )->count() + 1;
 
         $station = WorkoutStation::create([
             'template_id' => $request->template_id,
             'exercise_id' => $request->exercise_id,
-            'station_number' => $request->station_number,
-            'sort_order' => $request->sort_order ?? 1,
+            'station_number' => $nextStationNumber,
+            'sort_order' => $nextStationNumber,
             'work_duration_override' => $request->work_duration_override,
             'rest_duration_override' => $request->rest_duration_override,
             'total_sets_override' => $request->total_sets_override,
@@ -52,7 +52,6 @@ class WorkoutStationController extends Controller
             'data' => $station
         ], 201);
     }
-
     /**
      * Update station
      */
@@ -88,4 +87,30 @@ class WorkoutStationController extends Controller
             'message' => 'Station deleted'
         ]);
     }
+
+    public function reorder(Request $request)
+{
+    $request->validate([
+        'stations' => 'required|array',
+        'stations.*.id' => 'required|exists:workout_stations,id',
+        'stations.*.station_number' => 'required|integer',
+    ]);
+
+    foreach ($request->stations as $station) {
+
+        WorkoutStation::where(
+            'id',
+            $station['id']
+        )->update([
+            'station_number' =>
+                $station['station_number']
+        ]);
+    }
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Workout reordered'
+    ]);
+}
+
 }

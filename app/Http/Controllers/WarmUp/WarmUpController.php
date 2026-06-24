@@ -56,4 +56,25 @@ class WarmupController extends Controller
             'message' => 'Warmup deleted'
         ]);
     }
+
+   public function reorder(Request $request)
+{
+    $request->validate([
+        'items' => 'required|array',
+        'items.*.id' => 'required|exists:warmup_exercises,id',
+        'items.*.sort_order' => 'required|integer',
+    ]);
+
+    foreach ($request->items as $item) {
+        WarmupExercise::where('id', $item['id'])
+            ->update([
+                'sort_order' => $item['sort_order']
+            ]);
+    }
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Warmup reordered'
+    ]);
+}
 }

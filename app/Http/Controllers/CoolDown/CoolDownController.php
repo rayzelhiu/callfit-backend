@@ -56,4 +56,26 @@ class CooldownController extends Controller
             'message' => 'Cooldown deleted'
         ]);
     }
+
+    public function reorder(Request $request)
+{
+    $request->validate([
+    'items' => 'required|array',
+    'items.*.id' => 'required|exists:cooldown_exercises,id',
+    'items.*.sort_order' => 'required|integer',
+]);
+
+    foreach ($request->items as $item) {
+        CooldownExercise::where('id', $item['id'])
+            ->update([
+                'sort_order' => $item['sort_order']
+            ]);
+    }
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Cooldown reordered'
+    ]);
+}
+
 }

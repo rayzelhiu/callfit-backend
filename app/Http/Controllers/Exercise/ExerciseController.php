@@ -17,43 +17,73 @@ class ExerciseController extends Controller
         ]);
     }
 
-    public function store(StoreExerciseRequest $request)
-    {
-        $data = $request->validated();
+   public function store(StoreExerciseRequest $request)
+{
+    $data = $request->validated();
 
-        $data['category'] = $data['category'] ?? 'general';
+    $data['category'] = $data['category'] ?? 'general';
 
-        $exercise = Exercise::create($data);
-        return response()->json([
-            'success' => true,
-            'message' => 'Exercise berhasil ditambahkan',
-            'data' => $exercise
-        ], 201);
+    // VIDEO SAFE UPLOAD
+    if ($request->hasFile('video')) {
+        $file = $request->file('video');
+
+        $path = $file->store('videos', 'public');
+
+        $data['video_url'] = asset('storage/' . $path);
     }
 
-    public function show(string $id)
-    {
-        $exercise = Exercise::findOrFail($id);
+    // THUMBNAIL SAFE UPLOAD
+    if ($request->hasFile('thumbnail')) {
+        $file = $request->file('thumbnail');
 
-        return response()->json([
-            'success' => true,
-            'data' => $exercise
-        ]);
+        $path = $file->store('thumbnails', 'public');
+
+        $data['thumbnail_url'] = asset('storage/' . $path);
     }
 
-    public function update(UpdateExerciseRequest $request, string $id)
-    {
-        $exercise = Exercise::findOrFail($id);
+    $exercise = Exercise::create($data);
 
-        $exercise->update($request->validated());
+    return response()->json([
+        'success' => true,
+        'data' => $exercise
+    ]);
+}
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Exercise berhasil diupdate',
-            'data' => $exercise
-        ]);
+public function update(UpdateExerciseRequest $request, string $id)
+{
+    $exercise = Exercise::findOrFail($id);
+
+    $data = $request->validated();
+
+    // VIDEO UPDATE
+    if ($request->hasFile('video')) {
+        $path = $request->file('video')->store('videos', 'public');
+        $data['video_url'] = asset('storage/' . $path);
     }
 
+    // THUMBNAIL UPDATE (FIX UTAMA)
+    if ($request->hasFile('thumbnail')) {
+        $path = $request->file('thumbnail')->store('thumbnails', 'public');
+        $data['thumbnail_url'] = asset('storage/' . $path);
+    }
+
+    // ❗ BLOCK STRING RUSAK (INI YANG FIX "FROG")
+    if (isset($data['thumbnail_url']) && !str_contains($data['thumbnail_url'], 'http')) {
+        unset($data['thumbnail_url']);
+    }
+
+    if (isset($data['video_url']) && !str_contains($data['video_url'], 'http')) {
+        unset($data['video_url']);
+    }
+
+    $exercise->update($data);
+
+    return response()->json([
+        'success' => true,
+        'data' => $exercise->fresh()
+    ]);
+}
+   
     public function destroy(string $id)
     {
         $exercise = Exercise::findOrFail($id);

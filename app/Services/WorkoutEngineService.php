@@ -6,515 +6,157 @@ use App\Models\WorkoutSession;
 
 class WorkoutEngineService
 {
-    public function getCurrentState(WorkoutSession $session): array
-    {
-        $phase = $this->getCurrentPhase($session);
+   public function getCurrentState(WorkoutSession $session): array
+{
+    $seq = $this->buildSequence($session);
 
-        return [
+    $start = $session->started_at->timestamp;
+    $now = now()->timestamp;
 
-            'status' => $session->status,
+    $elapsed = $now - $start - ($session->paused_total_seconds ?? 0);
 
-            'phase' => $phase,
+    $cursor = 0;
+    $index = 0;
 
-            'station' => $phase === 'finished'
-                ? null
-                : $this->getCurrentStation($session),
+    $stations = $session->template->stations->values();
 
-            'total_stations' => $this->getStationCount($session),
+    foreach ($seq as $step) {
 
-            'exercise' => $phase === 'finished'
-            ? null
-            : $this->getCurrentExerciseByPhase($session, $phase),
+        $cursor += $step['duration'];
 
-            'current_set' => $phase === 'finished'
-                ? null
-                : $this->getCurrentSet($session),
+        if ($elapsed < $cursor) {
 
-            'total_sets' => $this->template($session)->total_sets,
+            $stepStart = $cursor - $step['duration'];
+            $remaining = max(0, $step['duration'] - ($elapsed - $stepStart));
 
-            'current_round' => $this->getCurrentRound($session),
+            $isWork = $step['type'] === 'work';
 
-            'total_rounds' => $this->template($session)->total_rounds,
+            $activeStationIndex = null;
+            $activeExercise = null;
 
-            'remaining_time' => $this->getRemainingTime($session),
+            if ($isWork) {
 
-            'is_finished' => $phase === 'finished',
+                $activeStationIndex = $stations
+                    ->search(fn ($s) => $s->station_number == $step['station']);
 
-        ];
-    }
-    public function getElapsedSeconds(WorkoutSession $session): int
-    {
-        // Kalau sedang pause, gunakan waktu pause sebagai acuan
-        $referenceTime = $session->status === 'paused'
-            ? $session->paused_at
-            : now();
+                $activeExercise = $step['exercise'] ?? null;
+            }
 
-        $base = $session->started_at->diffInSeconds($referenceTime);
+            return [
+                'phase' => $step['type'],
+                'remaining_time' => $remaining,
 
-        return max(
-            0,
-            $base - ($session->paused_total_seconds ?? 0)
-        );
-    }
-    private function template(WorkoutSession $session)
-    {
-        return $session->template;
-    }
+                // UI FLAGS
+                'is_work_phase' => $isWork,
 
-    private function getStationCount(WorkoutSession $session): int
-    {
-        return max(
-            1,
-            $this->template($session)
-                ->stations()
-                ->count()
-        );
-    }
+                'active_station_number' => $step['station'] ?? null,
 
-    private function getWarmupTotal(WorkoutSession $session): int
-    {
-        $template = $this->template($session);
+                'active_station_sort' => $step['sort_order'] ?? null,
 
-        return
-        $this->getWarmupCount($session)
-        *
-        $template->warmup_duration;
-    }
+                'active_exercise_id' => data_get($step, 'exercise.id'),
 
-    private function getCooldownTotal(WorkoutSession $session): int
-    {
-        $template = $this->template($session);
+                'has_video' => !empty(data_get($step, 'exercise.video_url')),
 
-        return
-        $this->getCooldownCount($session)
-        *
-        $template->cooldown_duration;
-    }
+                'has_thumbnail' => !empty(data_get($step, 'exercise.thumbnail_url')),
 
-    private function getStationDuration(WorkoutSession $session): int
-    {
-        $template = $this->template($session);
+                // timeline index (optional)
+                'index' => $index,
 
-        return
+                // debug / fallback
+                'active_station_index' => $activeStationIndex,
+                'active_exercise' => $activeExercise,
 
-            ($template->work_duration * $template->total_sets)
+                'phase_end' => $now + $remaining,
 
-            +
+                'round' => $step['round'] ?? null,
+                'set' => $step['set'] ?? null,
+                'station' => $step['station'] ?? null,
 
-            ($template->rest_duration * ($template->total_sets - 1))
-
-            +
-
-            $template->switch_duration;
-    }
-
-    private function getRoundDuration(WorkoutSession $session): int
-    {
-        return
-
-            $this->getStationDuration($session)
-
-            *
-
-        $this->getStationCount($session);
-    }
-
-    private function getWorkoutDuration(WorkoutSession $session): int
-    {
-  
-        return
-
-        $this->getRoundDuration($session)
-        *
-        $this->template($session)->total_rounds;
-
-    }
-
-    private function getWarmupCount(WorkoutSession $session): int
-    {
-        return $session->template
-            ->warmups()
-            ->count();
-    }
-
-    private function getCooldownCount(WorkoutSession $session): int
-    {
-        return $session->template
-            ->cooldowns()
-            ->count();
-    }
-
-    
-
-    public function getCurrentPhase(WorkoutSession $session): string
-    {
-
-
-        if ($session->status === 'finished') {
-        
-            return 'finished';
+                'context' => [
+                    'stations' => $session->template->stations->values(),
+                    'warmups' => $session->template->warmups,
+                    'cooldowns' => $session->template->cooldowns,
+                    'total_stations' => $session->template->stations->count(),
+                ]
+            ];
         }
 
-        $elapsed = $this->getElapsedSeconds($session);
+        $index++;
+    }
 
-        $warmupTotal = $this->getWarmupTotal($session);
-        $workoutTotal = $this->getWorkoutDuration($session);
-        $cooldownTotal = $this->getCooldownTotal($session);
+    return [
+        'phase' => 'finished',
+        'remaining_time' => 0,
+        'index' => 0
+    ];
+}
+    public function buildSequence($session): array
+    {
+        $t = $session->template;
+        $seq = [];
 
-        /*
-        |--------------------------------------------------------------------------
-        | Warmup
-        |--------------------------------------------------------------------------
-        */
+        $rounds = max(1, (int) $t->total_rounds);
+        $sets = max(1, (int) $t->total_sets);
 
-        if ($elapsed < $warmupTotal) {
-            return 'warmup';
+        /* ================= WARMUP (SORT ORDER FIX) ================= */
+        foreach ($t->warmups->sortBy('sort_order') as $w) {
+            $seq[] = [
+                'type' => 'warmup',
+                'duration' => $t->warmup_duration,
+                'exercise' => $w->exercise,
+                'sort_order' => $w->sort_order
+            ];
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Workout
-        |--------------------------------------------------------------------------
-        */
+        /* ================= WORK ================= */
+        for ($r = 1; $r <= $rounds; $r++) {
 
-        if ($elapsed < ($warmupTotal + $workoutTotal)) {
+            foreach ($t->stations->sortBy('sort_order') as $st) {
 
-            $elapsedWorkout = $elapsed - $warmupTotal;
+                for ($s = 1; $s <= $sets; $s++) {
 
-            $roundElapsed = $elapsedWorkout % $this->getRoundDuration($session);
+                    $seq[] = [
+                        'type' => 'work',
+                        'round' => $r,
+                        'station' => $st->station_number,
+                        'set' => $s,
+                        'duration' => $t->work_duration,
+                        'exercise' => $st->exercise,
+                        'sort_order' => $st->sort_order
+                    ];
 
-            $stationElapsed = $roundElapsed % $this->getStationDuration($session);
-
-            $template = $this->template($session);
-
-            $cursor = 0;
-
-            for ($set = 1; $set <= $template->total_sets; $set++) {
-
-                // WORK
-
-                if ($stationElapsed < ($cursor + $template->work_duration)) {
-                    return 'work';
-                }
-
-                $cursor += $template->work_duration;
-
-                // REST
-
-                if ($set < $template->total_sets) {
-
-                    if ($stationElapsed < ($cursor + $template->rest_duration)) {
-                        return 'rest';
+                    if ($s < $sets) {
+                        $seq[] = [
+                            'type' => 'rest',
+                            'station' => $st->station_number,
+                            'set' => $s,
+                            'duration' => $t->rest_duration
+                        ];
                     }
 
-                    $cursor += $template->rest_duration;
-                }
-            }
-
-            return 'switch';
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Cooldown
-        |--------------------------------------------------------------------------
-        */
-
-        if ($elapsed < ($warmupTotal + $workoutTotal + $cooldownTotal)) {
-            return 'cooldown';
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Finished
-        |--------------------------------------------------------------------------
-        */
-
-        return 'finished';
-    }
-
-    public function getCurrentRound(WorkoutSession $session): int
-    {
-        if ($this->isFinished($session)) {
-            return $this->template($session)->total_rounds;
-        }
-
-        
-        $elapsed = $this->getElapsedSeconds($session);
-
-        // Kurangi waktu warmup
-        $elapsed -= $this->getWarmupTotal($session);
-
-        // Masih di warmup
-        if ($elapsed < 0) {
-            return 1;
-        }
-
-        $roundDuration = $this->getRoundDuration($session);
-
-        // Safety jika round duration 0
-        if ($roundDuration <= 0) {
-            return 1;
-        }
-
-        $round = (int) floor($elapsed / $roundDuration) + 1;
-
-        return min(
-            max($round, 1),
-            $this->template($session)->total_rounds
-        );
-    }
-    
-    public function getCurrentStation(WorkoutSession $session): ?int
-    {
-        if ($this->isFinished($session)) {
-            return null;
-        }
-
-        $elapsed = $this->getElapsedSeconds($session);
-
-        $elapsed -= $this->getWarmupTotal($session);
-
-        if ($elapsed < 0) {
-            return 1;
-        }
-
-        $roundDuration = $this->getRoundDuration($session);
-
-        if ($roundDuration <= 0) {
-            return 1;
-        }
-
-        $stationDuration = $this->getStationDuration($session);
-
-        if ($stationDuration <= 0) {
-            return 1;
-        }
-
-        $roundElapsed = $elapsed % $roundDuration;
-
-        $station = floor(
-            $roundElapsed / $stationDuration
-        ) + 1;
-
-        return min(
-            (int) $station,
-            $this->getStationCount($session)
-        );
-    }
-
-    public function getCurrentSet(WorkoutSession $session): ?int
-    {
-
-        $roundDuration = $this->getRoundDuration($session);
-
-        if ($roundDuration <= 0) {
-            return 1;
-        }
-
-        $stationDuration = $this->getStationDuration($session);
-
-        if ($stationDuration <= 0) {
-            return 1;
-        }
-
-        if ($this->isFinished($session)) {
-            return null;
-        }
-        $template = $this->template($session);
-
-        $elapsed = $this->getElapsedSeconds($session);
-
-        $elapsed -= $this->getWarmupTotal($session);
-
-        if ($elapsed < 0) {
-            return 1;
-        }
-
-        $roundElapsed = $elapsed % $this->getRoundDuration($session);
-
-        $stationElapsed = $roundElapsed % $this->getStationDuration($session);
-
-        $cursor = 0;
-
-        for ($set = 1; $set <= $template->total_sets; $set++) {
-
-            $cursor += $template->work_duration;
-
-            if ($stationElapsed < $cursor) {
-                return $set;
-            }
-
-            if ($set < $template->total_sets) {
-
-                $cursor += $template->rest_duration;
-
-                if ($stationElapsed < $cursor) {
-                    return $set;
+                    if ($s === $sets) {
+                        $seq[] = [
+                            'type' => 'switch',
+                            'station' => $st->station_number,
+                            'duration' => $t->switch_duration
+                        ];
+                    }
                 }
             }
         }
 
-        return $template->total_sets;
-    }
-
-    public function getRemainingTime(WorkoutSession $session): int
-    {
-
-        if ($this->isFinished($session)) {
-            return 0;
+        /* ================= COOLDOWN (SORT ORDER FIX) ================= */
+        foreach ($t->cooldowns->sortBy('sort_order') as $c) {
+            $seq[] = [
+                'type' => 'cooldown',
+                'duration' => $t->cooldown_duration,
+                'exercise' => $c->exercise,
+                'sort_order' => $c->sort_order
+            ];
         }
 
-        $roundDuration = $this->getRoundDuration($session);
+        $seq[] = ['type' => 'finished', 'duration' => 0];
 
-        if ($roundDuration <= 0) {
-            return 0;
-        }
-
-        $stationDuration = $this->getStationDuration($session);
-
-        if ($stationDuration <= 0) {
-            return 0;
-        }
-
-        $template = $this->template($session);
-
-        $elapsed = $this->getElapsedSeconds($session);
-
-        $elapsed -= $this->getWarmupTotal($session);
-
-        if ($elapsed < 0) {
-            return $this->getWarmupTotal($session) - $this->getElapsedSeconds($session);
-        }
-
-        $roundElapsed = $elapsed % $this->getRoundDuration($session);
-
-        $stationElapsed = $roundElapsed % $this->getStationDuration($session);
-
-        $cursor = 0;
-
-        for ($set = 1; $set <= $template->total_sets; $set++) {
-
-            // WORK
-            if ($stationElapsed < ($cursor + $template->work_duration)) {
-
-                return ($cursor + $template->work_duration) - $stationElapsed;
-            }
-
-            $cursor += $template->work_duration;
-
-            // REST
-            if ($set < $template->total_sets) {
-
-                if ($stationElapsed < ($cursor + $template->rest_duration)) {
-
-                    return ($cursor + $template->rest_duration) - $stationElapsed;
-                }
-
-                $cursor += $template->rest_duration;
-            }
-        }
-
-        // SWITCH
-        return max(
-            0,
-            $this->getStationDuration($session) - $stationElapsed
-        );
+        return $seq;
     }
-
-        private function getWarmupIndex(WorkoutSession $session): int
-    {
-        $elapsed = $this->getElapsedSeconds($session);
-
-        return (int) floor(
-            $elapsed / max(1, $this->template($session)->warmup_duration)
-        );
-    }
-
-    private function getCooldownIndex(WorkoutSession $session): int
-    {
-        $elapsed = $this->getElapsedSeconds($session);
-
-        $workoutTime =
-            $this->getWarmupTotal($session) +
-            $this->getWorkoutDuration($session);
-
-        $after = $elapsed - $workoutTime;
-
-        if ($after < 0) {
-            return 0;
-        }
-
-        return (int) floor(
-            $after / max(1, $this->template($session)->cooldown_duration)
-        );
-    }
-    private function getWarmupExercise(WorkoutSession $session)
-    {
-        $index = $this->getWarmupIndex($session);
-
-        return $session->template
-            ->warmups()
-            ->with('exercise')
-            ->orderBy('sort_order')
-            ->get()
-            ->values()
-            ->get($index)
-            ?->exercise;
-    }
-
-        private function getWorkoutExercise(WorkoutSession $session)
-        {
-            if ($this->isFinished($session)) {
-                return null;
-            }
-
-            $stationNumber = $this->getCurrentStation($session);
-
-            if (!$stationNumber) {
-                return null;
-            }
-
-            $station = $session->template
-                ->stations()
-                ->with('exercise')
-                ->where('station_number', $stationNumber)
-                ->orderBy('station_number')
-                ->first();
-
-            return $station?->exercise;
-        }
-
-    private function getCooldownExercise(WorkoutSession $session)
-    {
-        $index = $this->getCooldownIndex($session);
-
-        return $session->template
-            ->cooldowns()
-            ->with('exercise')
-            ->orderBy('sort_order')
-            ->get()
-            ->values()
-            ->get($index)
-            ?->exercise;
-    }
-   private function getCurrentExerciseByPhase(WorkoutSession $session, string $phase)
-    {
-        return match ($phase) {
-
-            'warmup' => $this->getWarmupExercise($session),
-
-            'work', 'rest', 'switch' => $this->getWorkoutExercise($session),
-
-            'cooldown' => $this->getCooldownExercise($session),
-
-            default => null,
-        };
-    }
-    
-    public function isFinished(WorkoutSession $session): bool
-{
-    
-    return $this->getCurrentPhase($session) === 'finished';
-}
 }
