@@ -99,5 +99,5 @@ Route::get('/time', function () {
 });
     Route::get('/sessions/current-state', [WorkoutSessionController::class,'currentState']);
 Route::get('/tv/current', [TVController::class, 'current']);
-
+Route::post('/tv/advance', [TVController::class, 'advance']);
 

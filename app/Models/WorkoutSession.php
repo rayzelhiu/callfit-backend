@@ -21,6 +21,9 @@ class WorkoutSession extends Model
         'finished_at',
         'paused_at',
         'paused_total_seconds', // 🔥 INI WAJIB
+        'paused_snapshot_remaining',
+            'current_step_index',
+    'current_remaining_seconds',
     ];
 
     protected $casts = [
