@@ -24,23 +24,44 @@ class WorkoutSessionController extends Controller
 
     public function waiting()
 {
-    $sessions = \App\Models\WorkoutSession::with('template')
-        ->where('status', 'waiting')
-        ->orderBy('created_at', 'asc')
-        ->get();
+   $sessions = \App\Models\WorkoutSession::with([
+    'template.stations.exercise',
+])
+->where('status', 'waiting')
+->orderBy('created_at', 'asc')
+->get();
 
-    return response()->json([
-        'success' => true,
-        'data' => $sessions->map(function ($s) {
-            return [
-                'id' => $s->id,
-                'template_id' => $s->template_id,
-                'status' => $s->status,
-                'created_at' => $s->created_at,
-                'template_name' => $s->template->name ?? null,
-            ];
-        })
-    ]);
+return response()->json([
+    'success' => true,
+    'data' => $sessions->map(function ($s) {
+        return [
+            'id' => $s->id,
+            'status' => $s->status,
+            'created_at' => $s->created_at,
+
+            'template' => [
+                'id' => $s->template->id,
+                'name' => $s->template->name,
+
+                // ONLY STATIONS
+                'stations' => $s->template->stations->map(function ($st) {
+                    return [
+                        'id' => $st->id,
+                        'station_number' => $st->station_number,
+                        'sort_order' => $st->sort_order,
+                        'exercise' => [
+                            'id' => $st->exercise->id ?? null,
+                            'name' => $st->exercise->name ?? null,
+                            'video_url' => $st->exercise->video_url ?? null,
+                            'thumbnail_url' => $st->exercise->thumbnail_url ?? null,
+                        ],
+                    ];
+                })->values(),
+            ],
+        ];
+    }),
+]);
+
 }
 
     

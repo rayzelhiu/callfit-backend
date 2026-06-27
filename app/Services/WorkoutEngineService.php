@@ -27,6 +27,7 @@ class WorkoutEngineService
                         'type' => 'work',
                         'station' => $st->station_number,
                         'duration' => $t->work_duration,
+                        'set' => $s,
                     ];
 
                     if ($s < $t->total_sets) {
@@ -89,7 +90,7 @@ class WorkoutEngineService
                 'phase' => $step['type'],
                 'index' => $index,
                 'remaining_time' => $remaining,
-
+                'set' => $step['set'] ?? null,
                 'active_station_number' => $step['station'] ?? null,
                 'active_exercise_id' => data_get($step, 'exercise.id'),
 
