@@ -22,7 +22,6 @@ class WorkoutEngineService
         for ($r = 1; $r <= $t->total_rounds; $r++) {
             foreach ($t->stations->sortBy('sort_order') as $st) {
                 for ($s = 1; $s <= $t->total_sets; $s++) {
-
                     $seq[] = [
                         'type' => 'work',
                         'station' => $st->station_number,
@@ -55,11 +54,9 @@ class WorkoutEngineService
         return $seq;
     }
 
-  public function getCurrentState($session)
-
-  {
-
-       if ($session->status === 'paused') {
+    public function getCurrentState($session, $tvId = '1')
+    {
+        if ($session->status === 'paused') {
             return [
                 'phase' => 'paused',
                 'status' => 'paused',
@@ -68,59 +65,52 @@ class WorkoutEngineService
             ];
         }
 
-    $seq = $this->buildSequence($session);
+        $seq = $this->buildSequence($session);
+        $start = $session->started_at->timestamp;
+        $now = now()->timestamp;
+        $elapsed = $now - $start - ($session->paused_total_seconds ?? 0);
+        $cursor = 0;
 
-    $start = $session->started_at->timestamp;
-    $now = now()->timestamp;
+        foreach ($seq as $index => $step) {
+            $cursor += $step['duration'];
 
-    $elapsed = $now - $start - ($session->paused_total_seconds ?? 0);
+            if ($elapsed < $cursor) {
+                $stepStart = $cursor - $step['duration'];
+                $remaining = max(0, $step['duration'] - ($elapsed - $stepStart));
 
-    $cursor = 0;
+                // Filter stations: TV 1 (1-6), TV 2 (7-12)
+                $allStations = $session->template->stations;
+                $filteredStations = ($tvId == "1") ? $allStations->take(6) : $allStations->slice(6, 6);
 
-    foreach ($seq as $index => $step) {
+                return [
+                    'phase' => $step['type'],
+                    'index' => $index,
+                    'remaining_time' => $remaining,
+                    'set' => $step['set'] ?? null,
+                    'active_station_number' => $step['station'] ?? null,
+                    'active_exercise_id' => data_get($step, 'exercise.id'),
+                    'context' => [
+                        'stations' => $filteredStations->values(),
+                        'warmups' => $session->template->warmups,
+                        'cooldowns' => $session->template->cooldowns,
+                    ]
+                ];
+            }
+        }
 
-        $cursor += $step['duration'];
-
-        if ($elapsed < $cursor) {
-
-            $stepStart = $cursor - $step['duration'];
-            $remaining = max(0, $step['duration'] - ($elapsed - $stepStart));
-
+        if ($elapsed >= array_sum(array_column($seq, 'duration'))) {
+            $session->update(['status' => 'finished']);
             return [
-                'phase' => $step['type'],
-                'index' => $index,
-                'remaining_time' => $remaining,
-                'set' => $step['set'] ?? null,
-                'active_station_number' => $step['station'] ?? null,
-                'active_exercise_id' => data_get($step, 'exercise.id'),
-
+                'phase' => 'finished',
+                'status' => 'finished',
+                'index' => count($seq),
+                'remaining_time' => 0,
                 'context' => [
-                    'stations' => $session->template->stations,
+                    'stations' => $session->template->stations->take(6), // Fallback
                     'warmups' => $session->template->warmups,
                     'cooldowns' => $session->template->cooldowns,
                 ]
             ];
         }
     }
-
-    if ($elapsed >= array_sum(array_column($seq, 'duration'))) {
-    $session->update([
-        'status' => 'finished'
-    ]);
-
-    return [
-        'phase' => 'finished',
-        'status' => 'finished',
-        'index' => count($seq),
-        'remaining_time' => 0,
-        'context' => [
-            'stations' => $session->template->stations,
-            'warmups' => $session->template->warmups,
-            'cooldowns' => $session->template->cooldowns,
-        ]
-    ];
-}
-
-}
-
 }
